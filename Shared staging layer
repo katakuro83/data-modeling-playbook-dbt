@@ -1,0 +1,93 @@
+Create shared staging models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/staging
+
+cat > stg_customers.sql << 'EOF'
+select
+    customer_id,
+    first_name,
+    last_name,
+    lower(trim(email))     as email,
+    country,
+    cast(signup_date as date) as signup_date
+from {{ ref('raw_customers') }}
+EOF
+
+cat > stg_categories.sql << 'EOF'
+select
+    category_id,
+    category_name
+from {{ ref('raw_categories') }}
+EOF
+
+cat > stg_products.sql << 'EOF'
+select
+    product_id,
+    product_name,
+    category_id,
+    cast(unit_price as decimal(10,2)) as unit_price,
+    is_active
+from {{ ref('raw_products') }}
+EOF
+
+cat > stg_orders.sql << 'EOF'
+select
+    order_id,
+    customer_id,
+    cast(order_date as date) as order_date,
+    order_status
+from {{ ref('raw_orders') }}
+EOF
+
+cat > stg_order_items.sql << 'EOF'
+select
+    order_item_id,
+    order_id,
+    product_id,
+    cast(quantity as integer)      as quantity,
+    cast(unit_price as decimal(10,2)) as unit_price
+from {{ ref('raw_order_items') }}
+EOF
+
+ls
+Output
+
+stg_categories.sql
+stg_customers.sql
+stg_order_items.sql
+stg_orders.sql
+stg_products.sql
+
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Cleaned customer records. Shared input for all three modeling approaches."
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+
+  - name: stg_categories
+    description: "Product category lookup. Shared input for all three modeling approaches."
+    columns:
+      - name: category_id
+        tests: [unique, not_null]
+
+  - name: stg_products
+    description: "Cleaned product catalog. Shared input for all three modeling approaches."
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+
+  - name: stg_orders
+    description: "Order headers. Shared input for all three modeling approaches."
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+
+  - name: stg_order_items
+    description: "Order line items. Shared input for all three modeling approaches."
+    columns:
+      - name: order_item_id
+        tests: [unique, not_null]
