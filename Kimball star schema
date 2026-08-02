@@ -1,3 +1,5 @@
+Kimball star schema with category denormalized directly onto dim_products, and a fact table at order line grain
+
 Create Kimball star schema models
 bash
 
