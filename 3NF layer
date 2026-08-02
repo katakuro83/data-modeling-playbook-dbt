@@ -1,3 +1,5 @@
+3NF fully normalized: category split out, order header separate from line items
+
 Create 3NF models
 bash
 
