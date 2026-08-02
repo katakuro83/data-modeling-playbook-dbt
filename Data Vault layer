@@ -1,0 +1,240 @@
+Data Vault layer hubs, links, satellites. Hubs (business keys), links (relationships), satellites (historized attributes with hash_diff + load_date)
+
+Create Data Vault hub models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/data_vault
+
+cat > hub_customer.sql << 'EOF'
+-- Data Vault: Hub -- unique list of business keys only. No descriptive
+-- attributes here, ever -- those belong in a satellite.
+select distinct
+    {{ dbt_utils.generate_surrogate_key(['customer_id']) }} as customer_hk,
+    customer_id as customer_bk,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_customers') }}
+EOF
+
+cat > hub_product.sql << 'EOF'
+-- Data Vault: Hub for products
+select distinct
+    {{ dbt_utils.generate_surrogate_key(['product_id']) }} as product_hk,
+    product_id as product_bk,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_products') }}
+EOF
+
+cat > hub_order.sql << 'EOF'
+-- Data Vault: Hub for orders
+select distinct
+    {{ dbt_utils.generate_surrogate_key(['order_id']) }} as order_hk,
+    order_id as order_bk,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_orders') }}
+EOF
+
+ls
+Output
+
+hub_customer.sql
+hub_order.sql
+hub_product.sql
+
+Create Data Vault link models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/data_vault
+
+cat > link_order_customer.sql << 'EOF'
+-- Data Vault: Link -- records the relationship/transaction between an
+-- order and a customer. Links capture WHICH keys are related, not
+-- descriptive attributes about them.
+select distinct
+
+Create Data Vault link models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/data_vault
+
+cat > link_order_customer.sql << 'EOF'
+-- Data Vault: Link -- records the relationship/transaction between an
+-- order and a customer. Links capture WHICH keys are related, not
+-- descriptive attributes about them.
+select distinct
+    {{ dbt_utils.generate_surrogate_key(['o.order_id', 'o.customer_id']) }} as order_customer_lk,
+    {{ dbt_utils.generate_surrogate_key(['o.order_id']) }}    as order_hk,
+    {{ dbt_utils.generate_surrogate_key(['o.customer_id']) }} as customer_hk,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_orders') }} o
+EOF
+
+cat > link_order_product.sql << 'EOF'
+-- Data Vault: Link -- records that a given product appeared on a given
+-- order (order line grain relationship), one row per order_item
+select distinct
+    {{ dbt_utils.generate_surrogate_key(['oi.order_id', 'oi.product_id', 'oi.order_item_id']) }} as order_product_lk,
+    {{ dbt_utils.generate_surrogate_key(['oi.order_id']) }}   as order_hk,
+    {{ dbt_utils.generate_surrogate_key(['oi.product_id']) }} as product_hk,
+    oi.order_item_id,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_order_items') }} oi
+EOF
+
+ls
+Output
+
+hub_customer.sql
+hub_order.sql
+hub_product.sql
+link_order_customer.sql
+link_order_product.sql
+
+Create Data Vault satellite models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/data_vault
+
+cat > sat_customer.sql << 'EOF'
+-- Data Vault: Satellite -- descriptive attributes for the customer hub,
+-- timestamped and hashed so any future change lands as a NEW row,
+-- never an overwrite. This is what gives Data Vault built-in history.
+select
+    {{ dbt_utils.generate_surrogate_key(['customer_id']) }} as customer_hk,
+    first_name,
+    last_name,
+    email,
+    country,
+    signup_date,
+    {{ dbt_utils.generate_surrogate_key(['first_name', 'last_name', 'email', 'country']) }} as hash_diff,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_customers') }}
+EOF
+
+cat > sat_product.sql << 'EOF'
+-- Data Vault: Satellite for product attributes
+select
+    {{ dbt_utils.generate_surrogate_key(['p.product_id']) }} as product_hk,
+    p.product_name,
+    c.category_name as category,
+    p.unit_price,
+    p.is_active,
+    {{ dbt_utils.generate_surrogate_key(['p.product_name', 'c.category_name', 'p.unit_price', 'p.is_active']) }} as hash_diff,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_products') }} p
+left join {{ ref('stg_categories') }} c
+    on p.category_id = c.category_id
+EOF
+
+cat > sat_order.sql << 'EOF'
+-- Data Vault: Satellite for order attributes (e.g., order_status changing
+-- over time -- placed -> shipped -> delivered -- would each be a new row
+-- in a real incremental load, preserving the full status history)
+select
+    {{ dbt_utils.generate_surrogate_key(['order_id']) }} as order_hk,
+    order_date,
+    order_status,
+    {{ dbt_utils.generate_surrogate_key(['order_date', 'order_status']) }} as hash_diff,
+    current_timestamp as load_date,
+    'orders_system' as record_source
+from {{ ref('stg_orders') }}
+EOF
+
+ls
+Output
+
+hub_customer.sql
+hub_order.sql
+hub_product.sql
+link_order_customer.sql
+link_order_product.sql
+sat_customer.sql
+sat_order.sql
+sat_product.sql
+
+Data Vault models schema doc
+version: 2
+
+models:
+  - name: hub_customer
+    description: "Data Vault Hub: unique customer business keys only."
+    columns:
+      - name: customer_hk
+        tests: [unique, not_null]
+
+  - name: hub_product
+    description: "Data Vault Hub: unique product business keys only."
+    columns:
+      - name: product_hk
+        tests: [unique, not_null]
+
+  - name: hub_order
+    description: "Data Vault Hub: unique order business keys only."
+    columns:
+      - name: order_hk
+        tests: [unique, not_null]
+
+  - name: link_order_customer
+    description: "Data Vault Link: relationship between an order and the customer who placed it."
+    columns:
+      - name: order_customer_lk
+        tests: [unique, not_null]
+      - name: order_hk
+        tests:
+          - relationships:
+              to: ref('hub_order')
+              field: order_hk
+      - name: customer_hk
+        tests:
+          - relationships:
+              to: ref('hub_customer')
+              field: customer_hk
+
+  - name: link_order_product
+    description: "Data Vault Link: relationship between an order and each product on it (line item grain)."
+    columns:
+      - name: order_product_lk
+        tests: [unique, not_null]
+      - name: order_hk
+        tests:
+          - relationships:
+              to: ref('hub_order')
+              field: order_hk
+      - name: product_hk
+        tests:
+          - relationships:
+              to: ref('hub_product')
+              field: product_hk
+
+  - name: sat_customer
+    description: "Data Vault Satellite: historized descriptive attributes for customers."
+    columns:
+      - name: customer_hk
+        tests:
+          - relationships:
+              to: ref('hub_customer')
+              field: customer_hk
+
+  - name: sat_product
+    description: "Data Vault Satellite: historized descriptive attributes for products."
+    columns:
+      - name: product_hk
+        tests:
+          - relationships:
+              to: ref('hub_product')
+              field: product_hk
+
+  - name: sat_order
+    description: "Data Vault Satellite: historized descriptive attributes for orders (e.g. status changes over time)."
+    columns:
+      - name: order_hk
+        tests:
+          - relationships:
+              to: ref('hub_order')
+              field: order_hk
