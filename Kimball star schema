@@ -1,0 +1,116 @@
+Create Kimball star schema models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/kimball
+
+cat > dim_customers.sql << 'EOF'
+-- Kimball: denormalized customer dimension, ready to filter/group by directly
+select
+    {{ dbt_utils.generate_surrogate_key(['customer_id']) }} as customer_key,
+    customer_id,
+    first_name || ' ' || last_name as customer_name,
+    email,
+    country
+from {{ ref('stg_customers') }}
+EOF
+
+cat > dim_products.sql << 'EOF'
+-- Kimball: category_name is denormalized directly onto the product row --
+-- no join needed to filter/group by category in a report
+select
+    {{ dbt_utils.generate_surrogate_key(['p.product_id']) }} as product_key,
+    p.product_id,
+    p.product_name,
+    c.category_name as category,
+    p.is_active
+from {{ ref('stg_products') }} p
+left join {{ ref('stg_categories') }} c
+    on p.category_id = c.category_id
+EOF
+
+cat > dim_date.sql << 'EOF'
+-- Kimball: standard calendar dimension
+with date_spine as (
+    {{ dbt_utils.date_spine(
+        datepart="day",
+        start_date="cast('2023-01-01' as date)",
+        end_date="cast('2023-12-31' as date)"
+    ) }}
+)
+select
+    date_day as date_key,
+    date_day,
+    extract(year from date_day)  as year,
+    extract(month from date_day) as month,
+    extract(day from date_day)   as day,
+    extract(quarter from date_day) as quarter
+from date_spine
+EOF
+
+cat > fct_order_items.sql << 'EOF'
+-- Kimball: fact table at order line grain, foreign keys to each dimension,
+-- measures (quantity, unit_price, line_amount) ready to sum/aggregate directly
+select
+    {{ dbt_utils.generate_surrogate_key(['oi.order_item_id']) }} as order_item_key,
+    oi.order_item_id,
+    {{ dbt_utils.generate_surrogate_key(['o.customer_id']) }} as customer_key,
+    {{ dbt_utils.generate_surrogate_key(['oi.product_id']) }} as product_key,
+    o.order_date as date_key,
+    o.order_status,
+    oi.quantity,
+    oi.unit_price,
+    oi.quantity * oi.unit_price as line_amount
+from {{ ref('stg_order_items') }} oi
+join {{ ref('stg_orders') }} o
+    on oi.order_id = o.order_id
+EOF
+
+ls
+Output
+
+dim_customers.sql
+dim_date.sql
+dim_products.sql
+fct_order_items.sql
+
+dbt packages file for dbt_utils
+packages:
+  - package: dbt labs/dbt_utils
+    version: [">=1.1.0", "<2.0.0"]
+
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Kimball: denormalized customer dimension."
+    columns:
+      - name: customer_key
+        tests: [unique, not_null]
+
+  - name: dim_products
+    description: "Kimball: denormalized product dimension -- category_name flattened onto the row."
+    columns:
+      - name: product_key
+        tests: [unique, not_null]
+
+  - name: dim_date
+    description: "Kimball: standard calendar dimension, generated via dbt_utils.date_spine."
+    columns:
+      - name: date_key
+        tests: [unique, not_null]
+
+  - name: fct_order_items
+    description: "Kimball: fact table at order-line grain, with foreign keys to each dimension and pre computed measures."
+    columns:
+      - name: order_item_key
+        tests: [unique, not_null]
+      - name: customer_key
+        tests:
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_key
+      - name: product_key
+        tests:
+          - relationships:
+              to: ref('dim_products')
+              field: product_key
