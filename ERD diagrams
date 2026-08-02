@@ -1,0 +1,49 @@
+One Mermaid ERD per approach, rendering natively on GitHub
+# 3NF Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    CUSTOMERS ||--o{ ORDERS : places
+    ORDERS ||--o{ ORDER_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : "appears in"
+    CATEGORIES ||--o{ PRODUCTS : classifies
+
+    CUSTOMERS {
+        string customer_id PK
+        string first_name
+        string last_name
+        string email
+        string country
+        date signup_date
+    }
+
+    CATEGORIES {
+        string category_id PK
+        string category_name
+    }
+
+    PRODUCTS {
+        string product_id PK
+        string product_name
+        string category_id FK
+        decimal unit_price
+        boolean is_active
+    }
+
+    ORDERS {
+        string order_id PK
+        string customer_id FK
+        date order_date
+        string order_status
+    }
+
+    ORDER_ITEMS {
+        string order_item_id PK
+        string order_id FK
+        string product_id FK
+        int quantity
+        decimal unit_price
+    }
+```
+
+**Key characteristic:** every entity is normalized `category_name` lives only in `CATEGORIES`, order level attributes live only in `ORDERS`. Reporting on "revenue by category" requires joining all five tables.
