@@ -1,0 +1,46 @@
+Architected data schema and charted transformation methodology exploration
+name: 'data_modeling_playbook'
+version: '1.0.0'
+config version: 2
+
+profile: 'data_modeling_playbook'
+
+model paths: ["models"]
+seed paths: ["seeds"]
+
+target path: "target"
+clean targets:
+  - "target"
+  - "dbt_packages"
+
+seeds:
+  data_modeling_playbook:
+    +schema: raw
+
+models:
+  data_modeling_playbook:
+    staging:
+      +materialized: view
+      +schema: staging
+    nf3:
+      +materialized: table
+      +schema: nf3
+    kimball:
+      +materialized: table
+      +schema: kimball
+    data_vault:
+      +materialized: table
+      +schema: data_vault
+
+# Copy to ~/.dbt/profiles.yml
+# DuckDB runs entirely in process no cloud account, no credentials,
+# no server to stand up. This is what makes the repo runnable in
+# seconds for anyone comparing the three modeling approaches.
+
+data_modeling_playbook:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'data_modeling_playbook.duckdb'
+      threads: 4
