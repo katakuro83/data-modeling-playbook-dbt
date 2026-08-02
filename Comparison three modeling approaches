@@ -1,0 +1,84 @@
+Deep-dive decision comparing all three modeling approaches
+# Which Modeling Approach to Use
+
+The right choice depends on what is optimizing for.
+
+## Third Normal Form (3NF)
+
+**What it is:** Classic relational normalization every non key attribute depends on the whole key and nothing but the key. Redundancy is minimized; each fact is stored exactly once.
+
+**Use it when:**
+- Modeling an **operational/transactional system** (OLTP) the system of record itself, not a reporting layer
+- Write performance and data integrity matter more than read/query simplicity
+- Storage cost is a real constraint (less relevant today, but still true for very large normalized systems)
+- The consumers are applications performing single row lookups/writes, not analysts running aggregate queries
+
+**Avoid it when:**
+- Analysts or BI tools are the primary consumers every report requires multiple joins, which is slow and error prone to write by hand
+- You need historical tracking of changing attributes (3NF has no built in concept of "what did this customer's address used to be")
+
+**In this repo:** `models/nf3/` `customers`, `categories`, `products`, `orders`, `order_items` are fully normalized; category is split out from products, and order header is split from line items.
+
+---
+
+## Kimball Star Schema (Dimensional Modeling)
+
+**What it is:** Denormalized fact tables (measures + foreign keys) surrounded by denormalized dimension tables (descriptive attributes). Optimized for the query patterns analysts actually write: filter, group, aggregate.
+
+**Use it when:**
+- The primary consumers are **BI tools and analysts** star schemas map directly onto how people think about "slice and dice" reporting
+- Query performance and simplicity matter more than write side normalization purity
+- You're building a semantic layer that needs to be intuitive to non engineers
+- You want **industry-standard, widely understood** structures nearly every BI tool and analyst has encountered star schemas before
+
+**Avoid it when:**
+- Source systems change frequently and unpredictably dimension tables need rework whenever the grain or attributes of a dimension change
+- You need fine grained historical auditability beyond what SCD Type 2 dimensions provide (Data Vault handles this more systematically)
+
+**In this repo:** `models/kimball/` `dim_customers`, `dim_products` (with category denormalized directly onto the product row), `dim_date`, and `fct_order_items` at order line grain.
+
+---
+
+## Data Vault 2.0
+
+**What it is:** Splits data into three structures **Hubs** (unique business keys), **Links** (relationships/transactions between business keys), and **Satellites** (descriptive attributes, each row timestamped and source tagged). Nothing is ever updated in place; satellites are insert-only, so full history is preserved by construction.
+
+**Use it when:**
+- Integrating **many source systems** that will change independently over time adding a new source means adding new satellites/links, not restructuring existing ones
+- **Auditability and full historical traceability** are a hard requirement (regulated industries, compliance heavy environments)
+- The organization is large enough to justify the added modeling complexity Data Vault has real overhead that isn't worth it for a small, stable set of sources
+- Want a **raw, source-of-truth layer** that's insulated from downstream business logic changes, with Kimball style marts built on top of it for actual reporting
+
+**Avoid it when:**
+- Small team with one or two stable source systems the extra hub/link/satellite indirection is pure overhead with no payoff
+- End users need to query this layer directly Data Vault structures are not analyst friendly; they're meant to feed a presentation layer (often a Kimball mart) on top
+
+**In this repo:** `models/data_vault/` `hub_customer`, `hub_product`, `hub_order` (business keys + hash keys), `link_order_customer`, `link_order_product` (relationships), and `sat_customer`, `sat_product`, `sat_order` (historized attributes).
+
+---
+
+## A Common Real World Pattern
+
+These approaches aren't mutually exclusive a mature data platform often layers them:
+
+```
+Source systems (OLTP, 3NF)
+        │
+        ▼
+Data Vault (raw integration layer hubs/links/satellites, full history, source agnostic)
+        │
+        ▼
+Kimball star schema (presentation/mart layer what analysts and BI tools actually query)
+```
+
+Data Vault absorbs the pain of integrating messy, changing sources; Kimball absorbs the pain of making that integrated data easy to query. Using Data Vault *instead of* a presentation layer, or Kimball *as* raw integration layer, is where teams tend to get into trouble — each layer is solving a different problem.
+
+## Quick Decision Checklist
+
+| Question | If yes, lean toward... |
+|---|---|
+| Is this the operational system of record, not analytics? | 3NF |
+| Will analysts/BI tools query this directly? | Kimball |
+| Do you need full historical audit trails by design? | Data Vault |
+| Are you integrating many independently-changing source systems? | Data Vault (raw layer) + Kimball (mart layer) |
+| Is this a small, stable dataset for a small team? | Kimball alone is usually enough — skip Data Vault's overhead |
