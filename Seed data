@@ -1,4 +1,4 @@
-Seed data (shared source for all three models)
+Seed data (shared source for all three models). One shared source dataset (customers, categories, products, orders, order_items) that all three modeling approaches build from the comparison is apples to apples by construction.
 
 Architected data schema and charted transformation methodology exploration
 Shared seed CSVs used identically by all three modeling approaches
