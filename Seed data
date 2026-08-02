@@ -1,0 +1,73 @@
+Seed data (shared source for all three models)
+
+Architected data schema and charted transformation methodology exploration
+Shared seed CSVs used identically by all three modeling approaches
+
+bash
+
+cat > /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_customers.csv << 'EOF'
+customer_id,first_name,last_name,email,country,signup_date
+C001,Anna,Kowalska,anna.kowalska@example.com,Poland,2023-01-15
+C002,John,Smith,john.smith@example.com,United States,2023-02-03
+C003,Marta,Nowak,marta.nowak@example.com,Poland,2023-02-20
+C004,Liam,O'Brien,liam.obrien@example.com,Ireland,2023-03-11
+C005,Sofia,Rossi,sofia.rossi@example.com,Italy,2023-04-02
+C006,Chen,Wei,chen.wei@example.com,China,2023-04-19
+C007,Emma,Dubois,emma.dubois@example.com,France,2023-05-07
+C008,Piotr,Wisniewski,piotr.wisniewski@example.com,Poland,2023-05-25
+EOF
+
+cat > /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_categories.csv << 'EOF'
+category_id,category_name
+CAT01,Electronics
+CAT02,Furniture
+CAT03,Office Supplies
+EOF
+
+cat > /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_products.csv << 'EOF'
+product_id,product_name,category_id,unit_price,is_active
+P001,Wireless Mouse,CAT01,24.99,true
+P002,Mechanical Keyboard,CAT01,79.99,true
+P003,USB-C Hub,CAT01,34.50,true
+P004,Standing Desk,CAT02,299.00,true
+P005,Ergonomic Chair,CAT02,189.99,true
+P006,Notebook Set,CAT03,12.50,true
+P007,Desk Lamp,CAT02,45.00,false
+P008,Webcam HD,CAT01,59.99,true
+EOF
+
+cat > /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_orders.csv << 'EOF'
+order_id,customer_id,order_date,order_status
+O1001,C001,2023-06-01,delivered
+O1002,C002,2023-06-02,delivered
+O1003,C003,2023-06-03,shipped
+O1004,C001,2023-06-05,delivered
+O1005,C004,2023-06-06,cancelled
+O1006,C005,2023-06-07,delivered
+O1007,C006,2023-06-08,placed
+O1008,C002,2023-06-09,delivered
+EOF
+
+cat > /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_order_items.csv << 'EOF'
+order_item_id,order_id,product_id,quantity,unit_price
+OI001,O1001,P001,2,24.99
+OI002,O1002,P004,1,299.00
+OI003,O1003,P002,1,79.99
+OI004,O1004,P006,3,12.50
+OI005,O1004,P008,1,59.99
+OI006,O1005,P005,1,189.99
+OI007,O1006,P003,2,34.50
+OI008,O1007,P008,1,59.99
+OI009,O1008,P002,1,79.99
+OI010,O1008,P001,1,24.99
+EOF
+
+wc -l /home/data-modeling-playbook-dbt/dbt_project/seeds/*.csv
+Output
+
+   4 /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_categories.csv
+   9 /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_customers.csv
+  11 /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_order_items.csv
+   9 /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_orders.csv
+   9 /home/data-modeling-playbook-dbt/dbt_project/seeds/raw_products.csv
+  42 total
