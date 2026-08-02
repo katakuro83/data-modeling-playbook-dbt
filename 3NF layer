@@ -1,0 +1,70 @@
+Create 3NF models
+bash
+
+cd /home/data-modeling-playbook-dbt/dbt_project/models/nf3
+
+cat > nf3_customers.sql << 'EOF'
+-- 3NF: customer attributes stored once, no redundancy
+select
+    customer_id,
+    first_name,
+    last_name,
+    email,
+    country,
+    signup_date
+from {{ ref('stg_customers') }}
+EOF
+
+cat > nf3_categories.sql << 'EOF'
+-- 3NF: category is its own table -- products reference it by key,
+-- category_name is never repeated on every product row
+select
+    category_id,
+    category_name
+from {{ ref('stg_categories') }}
+EOF
+
+cat > nf3_products.sql << 'EOF'
+-- 3NF: product depends only on product_id; category is a foreign key,
+-- not a denormalized attribute
+select
+    product_id,
+    product_name,
+    category_id,
+    unit_price,
+    is_active
+from {{ ref('stg_products') }}
+EOF
+
+cat > nf3_orders.sql << 'EOF'
+-- 3NF: order header only -- line items live in their own table so
+-- order-level attributes aren't repeated once per line item
+select
+    order_id,
+    customer_id,
+    order_date,
+    order_status
+from {{ ref('stg_orders') }}
+EOF
+
+cat > nf3_order_items.sql << 'EOF'
+-- 3NF: line-item grain, referencing order and product by key.
+-- unit_price is captured here (price at time of order), separate
+-- from the current catalog price in nf3_products.
+select
+    order_item_id,
+    order_id,
+    product_id,
+    quantity,
+    unit_price
+from {{ ref('stg_order_items') }}
+EOF
+
+ls
+Output
+
+nf3_categories.sql
+nf3_customers.sql
+nf3_order_items.sql
+nf3_orders.sql
+nf3_products.sql
