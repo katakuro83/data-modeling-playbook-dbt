@@ -68,3 +68,56 @@ nf3_customers.sql
 nf3_order_items.sql
 nf3_orders.sql
 nf3_products.sql
+
+version: 2
+
+models:
+  - name: nf3_customers
+    description: "3NF: customer entity, fully normalized."
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+
+  - name: nf3_categories
+    description: "3NF: category entity, split out to avoid repeating category_name on every product."
+    columns:
+      - name: category_id
+        tests: [unique, not_null]
+
+  - name: nf3_products
+    description: "3NF: product entity, references category by foreign key rather than embedding it."
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+      - name: category_id
+        tests:
+          - relationships:
+              to: ref('nf3_categories')
+              field: category_id
+
+  - name: nf3_orders
+    description: "3NF: order header entity -- one row per order, no line item detail."
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: customer_id
+        tests:
+          - relationships:
+              to: ref('nf3_customers')
+              field: customer_id
+
+  - name: nf3_order_items
+    description: "3NF: order line item entity, grain = one row per product per order."
+    columns:
+      - name: order_item_id
+        tests: [unique, not_null]
+      - name: order_id
+        tests:
+          - relationships:
+              to: ref('nf3_orders')
+              field: order_id
+      - name: product_id
+        tests:
+          - relationships:
+              to: ref('nf3_products')
+              field: product_id
